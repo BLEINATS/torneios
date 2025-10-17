@@ -5,7 +5,6 @@ import Header from './components/Header';
 import { Scoreboard } from './pages/Scoreboard';
 import Results from './pages/Results';
 import Admin from './pages/Admin';
-import AdminLink from './components/AdminLink';
 import TournamentSelector from './pages/TournamentSelector';
 import { Bracket } from './pages/Bracket';
 import { MatchControl } from './pages/MatchControl';
@@ -45,7 +44,6 @@ function App() {
           </AnimatePresence>
         </main>
         {showSponsors && <Sponsors />}
-        <AdminLink />
       </div>
     </div>
   );

@@ -6,18 +6,18 @@ import { Trophy, Users, User, Calendar, CheckCircle, Clock, Trash2 } from 'lucid
 
 const ModalityIcon = ({ modality, color }: { modality: string, color: string }) => {
   switch (modality) {
-    case 'individual': return <User style={{ color }} />;
-    case 'duplas': return <Users style={{ color }} />;
-    case 'equipe': return <Trophy style={{ color }} />;
+    case 'individual': return <User style={{ color }} size={20} />;
+    case 'duplas': return <Users style={{ color }} size={20} />;
+    case 'equipe': return <Trophy style={{ color }} size={20} />;
     default: return null;
   }
 };
 
 const StatusIcon = ({ status }: { status: string }) => {
     switch (status) {
-      case 'planejado': return <Calendar className="text-blue-400" size={18}/>;
-      case 'em-andamento': return <Clock className="text-green-400" size={18}/>;
-      case 'finalizado': return <CheckCircle className="text-gray-400" size={18}/>;
+      case 'planejado': return <Calendar className="text-blue-400" size={16}/>;
+      case 'em-andamento': return <Clock className="text-green-400" size={16}/>;
+      case 'finalizado': return <CheckCircle className="text-gray-400" size={16}/>;
       default: return null;
     }
   };
@@ -52,28 +52,25 @@ const TournamentSelector: React.FC = () => {
             >
               <Link 
                 to={`/tournament/${tournament.id}`}
-                className="block relative bg-black bg-opacity-50 rounded-lg p-6 hover:bg-opacity-70 hover:scale-105 transition-all duration-300 border-2 border-transparent hover:border-brand-yellow h-full flex flex-col"
+                className="block relative bg-black bg-opacity-50 rounded-lg p-6 hover:bg-opacity-70 hover:scale-105 transition-all duration-300 border-2 border-transparent hover:border-brand-yellow h-full flex flex-col justify-between"
               >
-                <div className="flex items-start justify-between mb-4">
-                  <h3 className="text-2xl font-bold pr-8" style={{ color: tournament.colors?.secondary || secondaryTextColor }}>{tournament.name}</h3>
-                  <ModalityIcon modality={tournament.modality} color={tournament.colors?.secondary || secondaryTextColor} />
-                </div>
-                <div className="space-y-2 text-gray-300 capitalize text-sm flex-grow">
-                    <p className="flex items-center gap-2"><StatusIcon status={tournament.status} /> {tournament.status}</p>
-                    <div className="text-xs">
-                        {tournament.categories.map(cat => (
-                            <span key={cat.id} className="inline-block bg-gray-700 rounded-full px-2 py-1 mr-1 mb-1">{cat.group} / {cat.level}</span>
-                        ))}
-                    </div>
-                    <p>Inscritos: {tournament.teams.length}</p>
-                    <p>Data: {new Date(tournament.startDate).toLocaleDateString('pt-BR', {timeZone: 'UTC'})}</p>
+                <div>
+                  <div className="flex items-start justify-between mb-4">
+                    <h3 className="text-3xl font-black pr-8" style={{ color: tournament.colors?.secondary || secondaryTextColor }}>{tournament.name}</h3>
+                    <ModalityIcon modality={tournament.modality} color={tournament.colors?.secondary || secondaryTextColor} />
+                  </div>
+                  <div className="space-y-3 text-white text-base">
+                      <p className="flex items-center gap-2 capitalize"><StatusIcon status={tournament.status} /> {tournament.status.replace('-', ' ')}</p>
+                      <p>Inscritos: {tournament.teams.length}</p>
+                      <p>Data: {new Date(tournament.startDate).toLocaleDateString('pt-BR', {timeZone: 'UTC'})}</p>
+                  </div>
                 </div>
                 <button
                   onClick={(e) => handleDelete(e, tournament.id, tournament.name)}
-                  className="absolute bottom-3 right-3 z-10 p-2 bg-red-600 text-white rounded-full hover:bg-red-700 transition-colors"
+                  className="absolute bottom-6 right-6 z-10 p-3 bg-red-600 text-white rounded-full hover:bg-red-700 transition-colors transform hover:scale-110"
                   title="Excluir Torneio"
                 >
-                  <Trash2 size={16} />
+                  <Trash2 size={20} />
                 </button>
               </Link>
             </motion.div>

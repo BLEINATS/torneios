@@ -29,6 +29,8 @@ interface DataContextType {
   updateTournament: (tournamentId: string, data: Partial<Omit<Tournament, 'id' | 'categories' | 'teams' | 'matches' | 'sponsors' | 'colors'>>, categories: Partial<TournamentCategory>[]) => Promise<void>;
   deleteTournament: (tournamentId: string) => Promise<void>;
   addTeam: (tournamentId: string, categoryId: string, teamName: string, players: string[]) => Promise<void>;
+  updateTeam: (teamId: string, teamName: string, players: { id: string; name: string }[]) => Promise<void>;
+  deleteTeam: (teamId: string) => Promise<void>;
   addSponsor: (tournamentId: string, name: string, logo: string) => Promise<void>;
   deleteSponsor: (tournamentId: string, sponsorId: string) => Promise<void>;
   createMatch: (tournamentId: string, categoryId: string, team1Id: string, team2Id: string, round: number, court: string, scheduledTime: string) => Promise<void>;
@@ -54,6 +56,7 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
 
   const fetchData = useCallback(async () => {
     setIsLoading(true);
+
     const { data: tournamentsData, error: tournamentsError } = await supabase.from('tournaments').select('*');
     const { data: categoriesData, error: categoriesError } = await supabase.from('categories').select('*');
     const { data: teamsData, error: teamsError } = await supabase.from('teams').select('*');
@@ -130,14 +133,11 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
   }, [fetchData]);
 
   const selectTournament = useCallback((tournamentId: string | null) => {
-    if (tournamentId !== selectedTournamentId) {
-      setSelectedTournamentId(tournamentId);
-      // Resetting featured matches when tournament changes
-      setFeaturedMatchIds([]);
-    }
-  }, [selectedTournamentId]);
+    setSelectedTournamentId(tournamentId);
+  }, []);
 
   useEffect(() => {
+    setFeaturedMatchIds([]);
     const foundTournament = tournaments.find(t => t.id === selectedTournamentId);
     if (foundTournament) {
       setBackgroundImage(foundTournament.backgroundImage || DEFAULT_BG);
@@ -152,16 +152,20 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     }
   }, [selectedTournamentId, tournaments]);
 
+  const selectedTournament = useMemo(() => tournaments.find(t => t.id === selectedTournamentId) || null, [tournaments, selectedTournamentId]);
+  const featuredMatches = useMemo(() => selectedTournament?.matches.filter(m => featuredMatchIds.includes(m.id)) || [], [selectedTournament, featuredMatchIds]);
+  const liveMatch = useMemo(() => selectedTournament?.matches.find(m => m.status === 'live'), [selectedTournament]);
+  const upcomingMatches = useMemo(() => selectedTournament?.matches.filter(m => m.status === 'upcoming').sort((a, b) => (a.court > b.court) ? 1 : -1) || [], [selectedTournament]);
+  const finishedMatches = useMemo(() => selectedTournament?.matches.filter(m => m.status === 'finished') || [], [selectedTournament]);
+
   const updateTournamentBranding = useCallback(async (tournamentId: string, urls: { bg?: string; logo?: string }) => {
     const { error } = await supabase.from('tournaments').update({ backgroundImage: urls.bg, logoImage: urls.logo }).eq('id', tournamentId);
-    if (error) console.error("Error updating branding:", error);
-    await fetchData();
+    if (error) console.error("Error updating branding:", error); else await fetchData();
   }, [fetchData]);
 
   const updateTournamentColors = useCallback(async (tournamentId: string, colors: TournamentColors) => {
     const { error } = await supabase.from('tournaments').update({ colors }).eq('id', tournamentId);
-    if (error) console.error("Error updating colors:", error);
-    await fetchData();
+    if (error) console.error("Error updating colors:", error); else await fetchData();
   }, [fetchData]);
 
   const toggleFeaturedMatch = useCallback((matchId: string) => {
@@ -171,192 +175,160 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
   const clearFeaturedMatches = useCallback(() => setFeaturedMatchIds([]), []);
 
   const addTournament = useCallback(async (data: Omit<Tournament, 'id' | 'teams' | 'matches' | 'backgroundImage' | 'logoImage' | 'sponsors' | 'colors'>) => {
-    const { data: newTournamentData, error: tournamentError } = await supabase
-      .from('tournaments').insert({
-        name: data.name, tournamentType: data.tournamentType, status: data.status, modality: data.modality,
-        startDate: data.startDate, endDate: data.endDate, startTime: data.startTime, endTime: data.endTime, courts: data.courts,
-        backgroundImage: DEFAULT_BG, logoImage: DEFAULT_LOGO, colors: { primary: DEFAULT_PRIMARY_COLOR, secondary: DEFAULT_SECONDARY_COLOR }
-      }).select().single();
+    const { data: newTournamentData, error: tournamentError } = await supabase.from('tournaments').insert({
+      name: data.name, tournamentType: data.tournamentType, status: data.status, modality: data.modality,
+      startDate: data.startDate, endDate: data.endDate, startTime: data.startTime, endTime: data.endTime, courts: data.courts,
+      backgroundImage: DEFAULT_BG, logoImage: DEFAULT_LOGO, colors: { primary: DEFAULT_PRIMARY_COLOR, secondary: DEFAULT_SECONDARY_COLOR }
+    }).select().single();
     if (tournamentError) { console.error('Error adding tournament:', tournamentError); return; }
-
     const categoriesToInsert = data.categories.map(cat => ({
-      tournament_id: newTournamentData.id,
-      group: cat.group,
-      level: cat.level,
-      prize1: cat.prize1,
-      prize2: cat.prize2,
-      prize3: cat.prize3,
-      max_entries: cat.maxEntries,
-      entry_fee: cat.entryFee,
+      tournament_id: newTournamentData.id, group: cat.group, level: cat.level, prize1: cat.prize1, prize2: cat.prize2, prize3: cat.prize3,
+      max_entries: cat.maxEntries, entry_fee: cat.entryFee,
     }));
     const { error: categoriesError } = await supabase.from('categories').insert(categoriesToInsert);
-    if (categoriesError) { console.error('Error adding categories:', categoriesError); return; }
-    await fetchData();
+    if (categoriesError) console.error('Error adding categories:', categoriesError); else await fetchData();
   }, [fetchData]);
 
-  const updateTournament = useCallback(async (
-    tournamentId: string, 
-    data: Partial<Omit<Tournament, 'id' | 'categories' | 'teams' | 'matches' | 'sponsors' | 'colors'>>,
-    categoriesToUpdate: Partial<TournamentCategory>[]
-) => {
-    // 1. Update the main tournament data
+  const updateTournament = useCallback(async (tournamentId: string, data: Partial<Omit<Tournament, 'id' | 'categories' | 'teams' | 'matches' | 'sponsors' | 'colors'>>, categoriesToUpdate: Partial<TournamentCategory>[]) => {
     const { error: tournamentError } = await supabase.from('tournaments').update(data).eq('id', tournamentId);
     if (tournamentError) { console.error('Error updating tournament:', tournamentError); return; }
-
-    // 2. Upsert categories (add new ones, update existing ones)
+    
     const categoriesToUpsert = categoriesToUpdate.map(cat => ({
         id: cat.id || faker.string.uuid(),
         tournament_id: tournamentId,
         group: cat.group, level: cat.level, prize1: cat.prize1, prize2: cat.prize2, prize3: cat.prize3,
         max_entries: cat.maxEntries, entry_fee: cat.entryFee,
     }));
-    const { error: upsertError } = await supabase.from('categories').upsert(categoriesToUpsert, { onConflict: 'id' });
-    if (upsertError) { console.error('Error upserting categories:', upsertError); alert(`Erro ao salvar categorias: ${upsertError.message}`); }
+    
+    const { data: upsertedData, error: upsertError } = await supabase.from('categories').upsert(categoriesToUpsert, { onConflict: 'id' }).select('id');
+    
+    if (upsertError) {
+        console.error('Error upserting categories:', upsertError);
+        alert(`Erro ao salvar categorias: ${upsertError.message}`);
+        await fetchData();
+        return;
+    }
 
-    // 3. Fetch original categories to determine which ones to delete
     const { data: originalCategories, error: fetchCatError } = await supabase.from('categories').select('id').eq('tournament_id', tournamentId);
-    if (fetchCatError) { console.error('Could not fetch original categories for deletion check'); }
-    else {
-        const submittedCategoryIds = new Set(categoriesToUpdate.map(c => c.id).filter(Boolean));
+    
+    if (fetchCatError) {
+        console.error('Could not fetch original categories for deletion check');
+    } else if (upsertedData) {
+        const submittedCategoryIds = new Set(upsertedData.map(c => c.id));
         const categoriesToDelete = originalCategories.filter(c => !submittedCategoryIds.has(c.id)).map(c => c.id);
         
         if (categoriesToDelete.length > 0) {
+            const { data: teamsInCategory, error: teamsError } = await supabase.from('teams').select('id').in('category_id', categoriesToDelete);
+            if (teamsError) { alert('Erro ao verificar equipes inscritas antes de deletar categoria.'); return; }
+            if (teamsInCategory.length > 0) { alert('Não é possível remover categorias que já possuem equipes inscritas.'); return; }
             const { error: deleteError } = await supabase.from('categories').delete().in('id', categoriesToDelete);
-            if (deleteError) { console.error('Error deleting categories:', deleteError); alert('Erro ao excluir categoria(s) removida(s). Verifique se não há equipes inscritas nelas antes de excluir.'); }
+            if (deleteError) console.error('Error deleting categories:', deleteError);
         }
     }
     
     await fetchData();
-}, [fetchData]);
+  }, [fetchData]);
 
   const deleteTournament = useCallback(async (tournamentId: string) => {
     const { error } = await supabase.from('tournaments').delete().eq('id', tournamentId);
-    if (error) console.error('Error deleting tournament:', error);
-    await fetchData();
+    if (error) console.error('Error deleting tournament:', error); else await fetchData();
   }, [fetchData]);
 
   const addTeam = useCallback(async (tournamentId: string, categoryId: string, teamName: string, playerNames: string[]) => {
-    const { data: newTeam, error: teamError } = await supabase.from('teams').insert({
-      tournament_id: tournamentId, category_id: categoryId, name: teamName
-    }).select().single();
+    const { data: newTeam, error: teamError } = await supabase.from('teams').insert({ tournament_id: tournamentId, category_id: categoryId, name: teamName }).select().single();
     if (teamError) { console.error('Error adding team:', teamError); return; }
-
     const playersToInsert = playerNames.map(name => ({ team_id: newTeam.id, name }));
     const { error: playerError } = await supabase.from('players').insert(playersToInsert);
-    if (playerError) console.error('Error adding players:', playerError);
-    await fetchData();
+    if (playerError) console.error('Error adding players:', playerError); else await fetchData();
+  }, [fetchData]);
+
+  const updateTeam = useCallback(async (teamId: string, teamName: string, players: { id: string; name: string }[]) => {
+    const { error: teamError } = await supabase.from('teams').update({ name: teamName }).eq('id', teamId);
+    if (teamError) { console.error('Error updating team name:', teamError); return; }
+    const playersToUpsert = players.map(p => ({ id: p.id, name: p.name, team_id: teamId }));
+    const { error: playerError } = await supabase.from('players').upsert(playersToUpsert);
+    if (playerError) console.error('Error updating players:', playerError); else await fetchData();
+  }, [fetchData]);
+
+  const deleteTeam = useCallback(async (teamId: string) => {
+    const { data: matches, error: matchError } = await supabase.from('matches').select('id').or(`team1_id.eq.${teamId},team2_id.eq.${teamId}`);
+    if (matchError) { alert(`Erro ao verificar partidas: ${matchError.message}`); return; }
+    if (matches.length > 0) { alert('Não é possível excluir um participante que já está em um confronto.'); return; }
+    const { error: deleteError } = await supabase.from('teams').delete().eq('id', teamId);
+    if (deleteError) console.error('Error deleting team:', deleteError); else await fetchData();
   }, [fetchData]);
 
   const addSponsor = useCallback(async (tournamentId: string, name: string, logo: string) => {
     const { error } = await supabase.from('sponsors').insert({ tournament_id: tournamentId, name, logo });
-    if (error) console.error('Error adding sponsor:', error);
-    await fetchData();
+    if (error) console.error('Error adding sponsor:', error); else await fetchData();
   }, [fetchData]);
 
   const deleteSponsor = useCallback(async (tournamentId: string, sponsorId: string) => {
     const { error } = await supabase.from('sponsors').delete().eq('id', sponsorId);
-    if (error) console.error('Error deleting sponsor:', error);
-    await fetchData();
+    if (error) console.error('Error deleting sponsor:', error); else await fetchData();
   }, [fetchData]);
 
   const createMatch = useCallback(async (tournamentId: string, categoryId: string, team1Id: string, team2Id: string, round: number, court: string, scheduledTime: string) => {
-    const { error } = await supabase.from('matches').insert({
-      tournament_id: tournamentId, category_id: categoryId, team1_id: team1Id, team2_id: team2Id, round, court, scheduledTime,
-      status: 'upcoming', team1_score: 0, team2_score: 0
-    });
-    if (error) console.error('Error creating match:', error);
-    await fetchData();
+    const { error } = await supabase.from('matches').insert({ tournament_id: tournamentId, category_id: categoryId, team1_id: team1Id, team2_id: team2Id, round, court, scheduledTime, status: 'upcoming', team1_score: 0, team2_score: 0 });
+    if (error) console.error('Error creating match:', error); else await fetchData();
   }, [fetchData]);
 
   const updateMatchDetails = useCallback(async (tournamentId: string, matchId: string, details: { court?: string; date?: string; scheduledTime?: string; score1?: number; score2?: number }) => {
-    const updatePayload: any = {};
-    if (details.court !== undefined) updatePayload.court = details.court;
-    if (details.date !== undefined) updatePayload.date = details.date;
-    if (details.scheduledTime !== undefined) updatePayload.scheduledTime = details.scheduledTime;
-    if (details.score1 !== undefined) updatePayload.team1_score = details.score1;
-    if (details.score2 !== undefined) updatePayload.team2_score = details.score2;
+    const updatePayload: any = { court: details.court, date: details.date, scheduledTime: details.scheduledTime, team1_score: details.score1, team2_score: details.score2 };
     const { error } = await supabase.from('matches').update(updatePayload).eq('id', matchId);
-    if (error) console.error('Error updating match details:', error);
-    await fetchData();
+    if (error) console.error('Error updating match details:', error); else await fetchData();
   }, [fetchData]);
-
+  
   const updateMatchScore = useCallback(async (tournamentId: string, matchId: string, team: 'team1' | 'team2') => {
-    const { data: match, error: fetchError } = await supabase
-        .from('matches')
-        .select('team1_score, team2_score')
-        .eq('id', matchId)
-        .single();
-
-    if (fetchError || !match) {
-        console.error("Could not fetch match to update score:", fetchError);
-        return;
-    }
-
+    const { data: match, error: fetchError } = await supabase.from('matches').select('team1_score, team2_score').eq('id', matchId).single();
+    if (fetchError || !match) { console.error("Could not fetch match to update score:", fetchError); return; }
     const scoreField = team === 'team1' ? 'team1_score' : 'team2_score';
     const currentScore = team === 'team1' ? match.team1_score : match.team2_score;
-
-    const { error: updateError } = await supabase
-        .from('matches')
-        .update({ [scoreField]: currentScore + 1 })
-        .eq('id', matchId);
-
-    if (updateError) {
-        console.error(`Error updating ${team} score:`, updateError);
-    } else {
-        await fetchData();
-    }
+    const { error: updateError } = await supabase.from('matches').update({ [scoreField]: currentScore + 1 }).eq('id', matchId);
+    if (updateError) console.error(`Error updating ${team} score:`, updateError); else await fetchData();
   }, [fetchData]);
 
   const startMatch = useCallback(async (tournamentId: string, matchId: string) => {
     const { error } = await supabase.from('matches').update({ status: 'live' }).eq('id', matchId);
-    if (error) console.error('Error starting match:', error);
-    await fetchData();
+    if (error) console.error('Error starting match:', error); else await fetchData();
   }, [fetchData]);
 
   const finishMatch = useCallback(async (tournamentId: string, matchId: string, score1?: number, score2?: number) => {
     const updatePayload: any = { status: 'finished' };
-     if (score1 !== undefined) updatePayload.team1_score = score1;
+    if (score1 !== undefined) updatePayload.team1_score = score1;
     if (score2 !== undefined) updatePayload.team2_score = score2;
     const { error } = await supabase.from('matches').update(updatePayload).eq('id', matchId);
-    if (error) console.error('Error finishing match:', error);
-    await fetchData();
+    if (error) console.error('Error finishing match:', error); else await fetchData();
   }, [fetchData]);
-
+  
   const generateAutomaticBracket = useCallback(async (tournamentId: string, categoryId: string) => {
-    const tournament = tournaments.find(t => t.id === tournamentId);
-    if (!tournament) return;
-    const categoryTeams = tournament.teams.filter(t => t.categoryId === categoryId);
-    if (categoryTeams.length < 2) { alert('Não há equipes suficientes.'); return; }
-    
-    const shuffledTeams = [...categoryTeams].sort(() => Math.random() - 0.5);
+    const { data: tournamentData, error: tourneyError } = await supabase.from('tournaments').select('courts').eq('id', tournamentId).single();
+    const { data: teamsData, error: teamsError } = await supabase.from('teams').select('id').eq('tournament_id', tournamentId).eq('category_id', categoryId);
+    if (tourneyError || teamsError || !tournamentData || !teamsData) { alert('Erro ao buscar dados para gerar chave.'); return; }
+    if (teamsData.length < 2) { alert('Não há equipes suficientes.'); return; }
+    const shuffledTeams = [...teamsData].sort(() => Math.random() - 0.5);
     const newMatches = [];
     for (let i = 0; i < Math.floor(shuffledTeams.length / 2) * 2; i += 2) {
       newMatches.push({
         tournament_id: tournamentId, category_id: categoryId, team1_id: shuffledTeams[i].id, team2_id: shuffledTeams[i + 1].id,
-        round: 1, court: tournament.courts[i % tournament.courts.length] || 'A definir', status: 'upcoming', team1_score: 0, team2_score: 0
+        round: 1, court: tournamentData.courts[i % tournamentData.courts.length] || 'A definir', status: 'upcoming', team1_score: 0, team2_score: 0
       });
     }
     const { error } = await supabase.from('matches').insert(newMatches);
-    if (error) console.error('Error generating bracket:', error);
-    await fetchData();
-  }, [fetchData, tournaments]);
+    if (error) console.error('Error generating bracket:', error); else await fetchData();
+  }, [fetchData]);
 
   const clearUpcomingMatches = useCallback(async (tournamentId: string, categoryId: string) => {
     const { error } = await supabase.from('matches').delete().eq('tournament_id', tournamentId).eq('category_id', categoryId).eq('status', 'upcoming');
-    if (error) console.error('Error clearing matches:', error);
-    await fetchData();
+    if (error) console.error('Error clearing matches:', error); else await fetchData();
   }, [fetchData]);
 
-  const selectedTournament = useMemo(() => tournaments.find(t => t.id === selectedTournamentId) || null, [tournaments, selectedTournamentId]);
-  const featuredMatches = useMemo(() => selectedTournament?.matches.filter(m => featuredMatchIds.includes(m.id)) || [], [selectedTournament, featuredMatchIds]);
-  const liveMatch = useMemo(() => selectedTournament?.matches.find(m => m.status === 'live'), [selectedTournament]);
-  const upcomingMatches = useMemo(() => selectedTournament?.matches.filter(m => m.status === 'upcoming').sort((a, b) => (a.court > b.court) ? 1 : -1) || [], [selectedTournament]);
-  const finishedMatches = useMemo(() => selectedTournament?.matches.filter(m => m.status === 'finished') || [], [selectedTournament]);
-
   const contextValue = useMemo(() => ({
-    tournaments, selectedTournament, liveMatch, upcomingMatches, finishedMatches, selectTournament, addTournament, updateTournament, deleteTournament, addTeam, addSponsor, deleteSponsor, createMatch, updateMatchDetails, updateMatchScore, startMatch, finishMatch, generateAutomaticBracket, clearUpcomingMatches, featuredMatches, toggleFeaturedMatch, clearFeaturedMatches, backgroundImage, logoImage, primaryTextColor, secondaryTextColor, updateTournamentBranding, updateTournamentColors, isLoading
+    tournaments, selectedTournament, liveMatch, upcomingMatches, finishedMatches, featuredMatches, backgroundImage, logoImage, primaryTextColor, secondaryTextColor, isLoading,
+    selectTournament, addTournament, updateTournament, deleteTournament, addTeam, updateTeam, deleteTeam, addSponsor, deleteSponsor, createMatch, updateMatchDetails, updateMatchScore, startMatch, finishMatch, generateAutomaticBracket, clearUpcomingMatches, toggleFeaturedMatch, clearFeaturedMatches, updateTournamentBranding, updateTournamentColors
   }), [
-    tournaments, selectedTournament, liveMatch, upcomingMatches, finishedMatches, selectTournament, addTournament, updateTournament, deleteTournament, addTeam, addSponsor, deleteSponsor, createMatch, updateMatchDetails, updateMatchScore, startMatch, finishMatch, generateAutomaticBracket, clearUpcomingMatches, featuredMatches, toggleFeaturedMatch, clearFeaturedMatches, backgroundImage, logoImage, primaryTextColor, secondaryTextColor, updateTournamentBranding, updateTournamentColors, isLoading
+    tournaments, selectedTournament, liveMatch, upcomingMatches, finishedMatches, featuredMatches, backgroundImage, logoImage, primaryTextColor, secondaryTextColor, isLoading,
+    selectTournament, addTournament, updateTournament, deleteTournament, addTeam, updateTeam, deleteTeam, addSponsor, deleteSponsor, createMatch, updateMatchDetails, updateMatchScore, startMatch, finishMatch, generateAutomaticBracket, clearUpcomingMatches, toggleFeaturedMatch, clearFeaturedMatches, updateTournamentBranding, updateTournamentColors
   ]);
 
   return (
