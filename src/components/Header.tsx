@@ -1,0 +1,16 @@
+import React from 'react';
+import { Link } from 'react-router-dom';
+import { useData } from '../context/DataContext';
+
+const Header: React.FC = () => {
+  const { logoImage } = useData();
+  return (
+    <header className="fixed top-6 left-6 z-20 pointer-events-auto">
+      <Link to="/">
+        <img src={logoImage} alt="Logo da Arena" className="h-24 w-auto object-contain" />
+      </Link>
+    </header>
+  );
+};
+
+export default Header;
