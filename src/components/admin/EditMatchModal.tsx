@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Match, Tournament } from '../../types';
 import { useData } from '../../context/DataContext';
-import { X, Save } from 'lucide-react';
+import { X, Save, CheckCircle, RotateCcw } from 'lucide-react';
 import { getParticipantDisplayName } from '../../utils/displayUtils';
 
 interface EditMatchModalProps {
@@ -13,7 +13,7 @@ interface EditMatchModalProps {
 }
 
 const EditMatchModal: React.FC<EditMatchModalProps> = ({ isOpen, onClose, match, tournament }) => {
-  const { updateMatchDetails } = useData();
+  const { updateMatchDetails, finishMatch, resetMatch } = useData();
   const [court, setCourt] = useState('');
   const [date, setDate] = useState('');
   const [scheduledTime, setScheduledTime] = useState('');
@@ -21,17 +21,16 @@ const EditMatchModal: React.FC<EditMatchModalProps> = ({ isOpen, onClose, match,
   const [score2, setScore2] = useState(0);
 
   useEffect(() => {
-    if (match) {
+    if (match && tournament) {
       setCourt(match.court);
-      setDate(match.date || '');
+      setDate(match.date || tournament.startDate || '');
       setScheduledTime(match.scheduledTime || '');
       setScore1(match.team1.score);
       setScore2(match.team2.score);
     }
-  }, [match]);
+  }, [match, tournament]);
 
-  const handleSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
+  const handleSaveChanges = () => {
     if (match && tournament) {
       updateMatchDetails(tournament.id, match.id, {
         court,
@@ -41,6 +40,22 @@ const EditMatchModal: React.FC<EditMatchModalProps> = ({ isOpen, onClose, match,
         score2: Number(score2),
       });
       onClose();
+    }
+  };
+
+  const handleFinishMatch = () => {
+    if (match && tournament) {
+      finishMatch(tournament.id, match.id, Number(score1), Number(score2));
+      onClose();
+    }
+  };
+
+  const handleResetMatch = () => {
+    if (match && tournament) {
+        if (window.confirm('Tem certeza que deseja resetar esta partida? O placar será zerado e ela voltará para a lista de "Próximos Jogos". Se esta partida gerou um confronto futuro, ele será apagado.')) {
+            resetMatch(tournament.id, match.id);
+            onClose();
+        }
     }
   };
 
@@ -72,7 +87,7 @@ const EditMatchModal: React.FC<EditMatchModalProps> = ({ isOpen, onClose, match,
                 <X size={24} />
               </button>
             </div>
-            <form onSubmit={handleSubmit}>
+            <div>
               <div className="p-6 space-y-4">
                 <div className="grid grid-cols-2 gap-4 items-center">
                     <p className="text-right font-semibold">{team1Name}</p>
@@ -121,15 +136,36 @@ const EditMatchModal: React.FC<EditMatchModalProps> = ({ isOpen, onClose, match,
                     </div>
                 </div>
               </div>
-              <div className="px-6 py-4 bg-gray-900/50 border-t border-gray-700 text-right">
-                <button
-                  type="submit"
-                  className="bg-brand-yellow text-gray-900 font-bold py-2 px-6 rounded-md hover:bg-yellow-400 transition-colors flex items-center justify-center gap-2 ml-auto"
-                >
-                  <Save size={18} /> Salvar Alterações
-                </button>
+              <div className="px-6 py-4 bg-gray-900/50 border-t border-gray-700 flex justify-between items-center">
+                {match.status === 'finished' && (
+                    <button
+                        type="button"
+                        onClick={handleResetMatch}
+                        className="bg-orange-600 text-white font-bold py-2 px-4 rounded-md hover:bg-orange-500 transition-colors flex items-center justify-center gap-2"
+                    >
+                        <RotateCcw size={18} /> Resetar Partida
+                    </button>
+                )}
+                <div className="flex justify-end gap-3 flex-grow">
+                  <button
+                    type="button"
+                    onClick={handleSaveChanges}
+                    className="bg-gray-600 text-white font-bold py-2 px-6 rounded-md hover:bg-gray-500 transition-colors flex items-center justify-center gap-2"
+                  >
+                    <Save size={18} /> Salvar Alterações
+                  </button>
+                  {match.status !== 'finished' && (
+                      <button
+                          type="button"
+                          onClick={handleFinishMatch}
+                          className="bg-green-600 text-white font-bold py-2 px-6 rounded-md hover:bg-green-500 transition-colors flex items-center justify-center gap-2"
+                      >
+                          <CheckCircle size={18} /> Finalizar Partida
+                      </button>
+                  )}
+                </div>
               </div>
-            </form>
+            </div>
           </motion.div>
         </motion.div>
       )}

@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
 import { useData } from '../../context/DataContext';
-import { Tournament, TournamentModality, TournamentStatus, TournamentCategory } from '../../types';
+import { Tournament, TournamentModality, TournamentStatus, TournamentCategory, TournamentFormat, GroupStageSettings, KnockoutSettings } from '../../types';
 import { Plus, Trash2, Trophy, X, Pencil } from 'lucide-react';
 import { faker } from '@faker-js/faker';
 import CustomCombobox from '../ui/CustomCombobox';
@@ -13,10 +13,14 @@ const TournamentCreation: React.FC = () => {
     
     const [editingTournament, setEditingTournament] = useState<Tournament | null>(null);
 
+    // Form State
     const [name, setName] = useState('');
     const [tournamentType, setTournamentType] = useState('Torneio');
     const [status, setStatus] = useState<TournamentStatus>('planejado');
     const [modality, setModality] = useState<TournamentModality>('duplas');
+    const [format, setFormat] = useState<TournamentFormat>('single_elimination');
+    const [groupSettings, setGroupSettings] = useState<GroupStageSettings>({ numGroups: 4, numQualifiers: 2 });
+    const [knockoutSettings, setKnockoutSettings] = useState<KnockoutSettings>({ thirdPlacePlayoff: true });
     const [startDate, setStartDate] = useState('');
     const [endDate, setEndDate] = useState('');
     const [startTime, setStartTime] = useState('09:00');
@@ -32,6 +36,9 @@ const TournamentCreation: React.FC = () => {
         setTournamentType('Torneio');
         setStatus('planejado');
         setModality('duplas');
+        setFormat('single_elimination');
+        setGroupSettings({ numGroups: 4, numQualifiers: 2 });
+        setKnockoutSettings({ thirdPlacePlayoff: true });
         setStartDate('');
         setEndDate('');
         setStartTime('09:00');
@@ -46,11 +53,14 @@ const TournamentCreation: React.FC = () => {
             setTournamentType(editingTournament.tournamentType);
             setStatus(editingTournament.status);
             setModality(editingTournament.modality);
+            setFormat(editingTournament.format);
+            setGroupSettings(editingTournament.groupSettings || { numGroups: 4, numQualifiers: 2 });
+            setKnockoutSettings(editingTournament.knockoutSettings || { thirdPlacePlayoff: true });
             setStartDate(editingTournament.startDate);
             setEndDate(editingTournament.endDate);
             setStartTime(editingTournament.startTime);
             setEndTime(editingTournament.endTime);
-            setCourts(editingTournament.courts);
+setCourts(editingTournament.courts);
             setCategories(editingTournament.categories);
         } else {
             resetForm();
@@ -89,21 +99,21 @@ const TournamentCreation: React.FC = () => {
     const handleSubmit = (e: React.FormEvent) => {
         e.preventDefault();
         if (name && startDate && endDate) {
+            const tournamentPayload = {
+                name, tournamentType, status, modality, format,
+                startDate, endDate, startTime, endTime, courts,
+                groupSettings: format === 'groups_then_knockout' ? groupSettings : undefined,
+                knockoutSettings: format === 'groups_then_knockout' ? knockoutSettings : undefined,
+            };
+
             if (editingTournament) {
                 const categoriesForUpdate: Partial<TournamentCategory>[] = categories.map(cat => ({
                     ...cat,
+                    id: cat.id || faker.string.uuid(),
                     maxEntries: Number(cat.maxEntries) || 0,
                     entryFee: Number(cat.entryFee) || 0,
                 }));
-    
-                updateTournament(
-                    editingTournament.id,
-                    {
-                        name, tournamentType, status, modality,
-                        startDate, endDate, startTime, endTime, courts,
-                    },
-                    categoriesForUpdate
-                );
+                updateTournament(editingTournament.id, tournamentPayload, categoriesForUpdate);
                 setEditingTournament(null);
             } else {
                 const finalCategories: TournamentCategory[] = categories.map(cat => ({
@@ -112,16 +122,9 @@ const TournamentCreation: React.FC = () => {
                     level: cat.level || 'Aberto',
                     maxEntries: Number(cat.maxEntries) || 0,
                     entryFee: Number(cat.entryFee) || 0,
-                    prize1: cat.prize1,
-                    prize2: cat.prize2,
-                    prize3: cat.prize3,
+                    prize1: cat.prize1, prize2: cat.prize2, prize3: cat.prize3,
                 }));
-
-                addTournament({
-                    name, tournamentType, status, modality,
-                    startDate, endDate, startTime, endTime, courts,
-                    categories: finalCategories
-                });
+                addTournament({ ...tournamentPayload, categories: finalCategories });
             }
             resetForm();
         }
@@ -140,6 +143,7 @@ const TournamentCreation: React.FC = () => {
                     <div className="lg:col-span-3 bg-black bg-opacity-50 rounded-lg p-6">
                         <h3 className="text-2xl font-bold mb-6">{editingTournament ? `Editando: ${editingTournament.name}` : 'Criar Novo Torneio'}</h3>
                         <form onSubmit={handleSubmit} className="space-y-6">
+                            {/* General Info */}
                             <fieldset className="grid grid-cols-1 md:grid-cols-2 gap-4">
                                 <legend className="text-lg font-semibold mb-2 col-span-full" style={{ color: secondaryTextColor }}>Informações Gerais</legend>
                                 <div className="md:col-span-2">
@@ -164,6 +168,34 @@ const TournamentCreation: React.FC = () => {
                                 </div>
                             </fieldset>
 
+                             {/* Format Settings */}
+                             <fieldset className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                <legend className="text-lg font-semibold mb-2 col-span-full" style={{ color: secondaryTextColor }}>Formato do Torneio</legend>
+                                <div className="md:col-span-2">
+                                    <select id="format" value={format} onChange={e => setFormat(e.target.value as TournamentFormat)} className="w-full bg-gray-700 border border-gray-600 rounded-md p-2 text-white">
+                                        <option value="single_elimination">Mata-Mata Simples</option>
+                                        <option value="groups_then_knockout">Grupos + Mata-Mata</option>
+                                    </select>
+                                </div>
+                                {format === 'groups_then_knockout' && (
+                                    <>
+                                        <div>
+                                            <label className="block text-sm font-medium text-gray-300 mb-1">Número de Grupos</label>
+                                            <input type="number" value={groupSettings.numGroups} onChange={e => setGroupSettings({...groupSettings, numGroups: Number(e.target.value)})} min="1" className="w-full bg-gray-700 border border-gray-600 rounded-md p-2 text-white" />
+                                        </div>
+                                         <div>
+                                            <label className="block text-sm font-medium text-gray-300 mb-1">Classificados por Grupo</label>
+                                            <input type="number" value={groupSettings.numQualifiers} onChange={e => setGroupSettings({...groupSettings, numQualifiers: Number(e.target.value)})} min="1" className="w-full bg-gray-700 border border-gray-600 rounded-md p-2 text-white" />
+                                        </div>
+                                        <div className="md:col-span-2 flex items-center gap-2">
+                                            <input type="checkbox" id="thirdPlace" checked={knockoutSettings.thirdPlacePlayoff} onChange={e => setKnockoutSettings({thirdPlacePlayoff: e.target.checked})} className="h-4 w-4 rounded border-gray-300 text-brand-yellow focus:ring-brand-yellow" />
+                                            <label htmlFor="thirdPlace" className="text-sm font-medium text-gray-300">Habilitar disputa de 3º lugar</label>
+                                        </div>
+                                    </>
+                                )}
+                            </fieldset>
+
+                            {/* Categories */}
                             <div>
                                 <fieldset>
                                     <legend className="text-lg font-semibold mb-2 col-span-full" style={{ color: secondaryTextColor }}>Categorias e Premiações</legend>

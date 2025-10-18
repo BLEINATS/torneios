@@ -14,9 +14,11 @@ export interface Team {
   name: string;
   players: Player[];
   categoryId: string;
+  groupName?: string;
 }
 
 export type MatchStatus = 'upcoming' | 'live' | 'finished';
+export type MatchStage = 'group' | 'knockout';
 
 export interface Match {
   id:string;
@@ -33,12 +35,14 @@ export interface Match {
     score: number;
   };
   status: MatchStatus;
+  stage: MatchStage;
   categoryId: string;
 }
 
 export type TournamentModality = 'individual' | 'duplas' | 'equipe';
 export type TournamentGroup = 'masculino' | 'feminino' | 'misto' | 'aberto';
 export type TournamentStatus = 'planejado' | 'em-andamento' | 'finalizado';
+export type TournamentFormat = 'single_elimination' | 'groups_then_knockout';
 
 export interface TournamentCategory {
     id: string;
@@ -56,12 +60,24 @@ export interface TournamentColors {
   secondary: string;
 }
 
+export interface GroupStageSettings {
+  numGroups: number;
+  numQualifiers: number;
+}
+
+export interface KnockoutSettings {
+  thirdPlacePlayoff: boolean;
+}
+
 export interface Tournament {
     id: string;
     name: string;
     tournamentType: string;
     status: TournamentStatus;
     modality: TournamentModality;
+    format: TournamentFormat;
+    groupSettings?: GroupStageSettings;
+    knockoutSettings?: KnockoutSettings;
     categories: TournamentCategory[];
     startDate: string;
     endDate: string;
@@ -74,4 +90,17 @@ export interface Tournament {
     logoImage?: string;
     sponsors?: Sponsor[];
     colors?: TournamentColors;
+}
+
+export interface GroupStanding {
+  id: string;
+  categoryId: string;
+  teamId: string;
+  groupName: string;
+  played: number;
+  wins: number;
+  losses: number;
+  pointsFor: number;
+  pointsAgainst: number;
+  pointsDifference: number;
 }

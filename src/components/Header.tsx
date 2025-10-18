@@ -10,7 +10,7 @@ const Header: React.FC = () => {
     <header className="fixed top-6 left-6 right-6 z-20 flex justify-between items-center pointer-events-none">
       <div className="pointer-events-auto">
         <Link to="/">
-          <img src={logoImage} alt="Logo da Arena" className="h-20 w-auto object-contain" />
+          <img src={logoImage} alt="Logo da Arena" className="h-24 w-auto object-contain" />
         </Link>
       </div>
       <div className="flex items-center gap-4 pointer-events-auto">

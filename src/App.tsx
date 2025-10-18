@@ -29,7 +29,7 @@ function App() {
         </div>
       )}
       <div className="absolute inset-0 bg-dark-overlay pointer-events-none" />
-      <div className={`relative z-10 min-h-screen flex flex-col ${showSponsors ? 'pb-24' : ''}`}>
+      <div className={`relative z-10 min-h-screen flex flex-col ${showSponsors ? 'pb-32' : ''}`}>
         <Header />
         <main className="flex-grow flex flex-col">
           <AnimatePresence mode="wait">

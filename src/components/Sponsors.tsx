@@ -32,7 +32,7 @@ const Sponsors: React.FC = () => {
         >
           {animatedSponsors.map((sponsor, index) => (
             <div key={`${sponsor.id}-${index}`} className="flex-shrink-0 mx-10 flex items-center justify-center">
-              <img src={sponsor.logo} alt={sponsor.name} className="h-10 object-contain" />
+              <img src={sponsor.logo} alt={sponsor.name} className="h-24 object-contain" />
             </div>
           ))}
         </div>

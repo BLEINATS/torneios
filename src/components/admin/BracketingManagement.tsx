@@ -5,7 +5,7 @@ import { getParticipantDisplayName } from '../../utils/displayUtils';
 import { Zap, Trash2, Plus, ArrowRight, X } from 'lucide-react';
 
 const BracketingManagement: React.FC = () => {
-    const { selectedTournament, generateAutomaticBracket, clearUpcomingMatches, createMatch, secondaryTextColor } = useData();
+    const { selectedTournament, generateAutomaticBracket, resetBracket, createMatch, secondaryTextColor } = useData();
     const [selectedCategoryId, setSelectedCategoryId] = useState<string>('');
     const [selection1, setSelection1] = useState<string | null>(null);
     const [selection2, setSelection2] = useState<string | null>(null);
@@ -38,14 +38,14 @@ const BracketingManagement: React.FC = () => {
     const { id: tournamentId, modality } = selectedTournament;
 
     const handleGenerate = () => {
-        if (window.confirm(`Isso irá limpar jogos futuros e criar uma nova chave da Rodada 1 com os inscritos nesta categoria. Deseja continuar?`)) {
+        if (window.confirm(`Isso irá apagar TODO o chaveamento existente (incluindo resultados) e gerar uma nova Rodada 1 para esta categoria. Deseja continuar?`)) {
             generateAutomaticBracket(tournamentId, selectedCategoryId);
         }
     };
 
-    const handleClear = () => {
-        if (window.confirm(`Tem certeza que deseja limpar TODOS os próximos jogos desta categoria?`)) {
-            clearUpcomingMatches(tournamentId, selectedCategoryId);
+    const handleReset = () => {
+        if (window.confirm(`Tem certeza que deseja resetar o chaveamento desta categoria? TODOS os jogos, incluindo resultados finalizados, serão apagados. Esta ação não pode ser desfeita.`)) {
+            resetBracket(tournamentId, selectedCategoryId);
         }
     };
     
@@ -100,8 +100,8 @@ const BracketingManagement: React.FC = () => {
                             <button onClick={handleGenerate} disabled={availableTeamsForDraw.length < 2} className="flex-1 flex items-center justify-center gap-2 px-4 py-2 text-sm font-bold rounded-md transition-colors bg-gray-600 hover:bg-gray-500 text-white disabled:opacity-50 disabled:cursor-not-allowed">
                                 <Zap size={16} /> Gerar Chaves
                             </button>
-                            <button onClick={handleClear} className="flex items-center justify-center gap-2 px-4 py-2 text-sm font-bold rounded-md transition-colors bg-red-800 hover:bg-red-700 text-white">
-                                <Trash2 size={16} /> Limpar Próximos Jogos
+                            <button onClick={handleReset} className="flex items-center justify-center gap-2 px-4 py-2 text-sm font-bold rounded-md transition-colors bg-red-800 hover:bg-red-700 text-white">
+                                <Trash2 size={16} /> Resetar Chaveamento
                             </button>
                         </div>
                     </div>
